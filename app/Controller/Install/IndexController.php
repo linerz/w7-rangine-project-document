@@ -19,6 +19,17 @@ use W7\Http\Message\Server\Request;
 
 class IndexController extends BaseController
 {
+	public function config(Request $request)
+	{
+		$isInstall = file_exists(RUNTIME_PATH . '/install.lock');
+		$data = [
+			'is_install' => $isInstall,
+			'api_host' => ienv('API_HOST'),
+			'db_database' => ienv('DATABASE_DEFAULT_DATABASE'),
+		];
+		return $this->data($data);
+	}
+
 	/**
 	 * @api {post} /install/systemDetection 系统检测
 	 * @apiName systemDetection
