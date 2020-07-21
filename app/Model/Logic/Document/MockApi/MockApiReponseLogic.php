@@ -40,69 +40,64 @@ class MockApiReponseLogic
 			$jsonData = json_decode($jsonData, true);
 		}
 		foreach ($data as $key => $val) {
-			if ($val->location == ChapterApiParam::LOCATION_REQUEST_HEADER) {
-				if (!$request->hasHeader($val->name)) {
-					$msg .= 'header:' . $val->name . '必填 ';
-				}
-			} elseif ($val->location == ChapterApiParam::LOCATION_REQUEST_QUERY_STRING) {
-				if ($request->query($val->name) == null) {
-					$msg .= 'query:' . $val->name . '必填 ';
-				}
-			} elseif ($val->location == ChapterApiParam::LOCATION_REQUEST_BODY_RAW || $jsonData) {
-				if (!(isset($jsonData[$val->name]) && $jsonData[$val->name])) {
-					$msg .= 'params:' . $val->name . '必填 ';
-				}
-			} elseif (in_array($val->location, [ChapterApiParam::LOCATION_REQUEST_BODY_FROM, ChapterApiParam::LOCATION_REQUEST_BODY_URLENCODED])) {
-				if ($request->post($val->name) == null) {
-					$msg .= 'params:' . $val->name . '必填 ';
+			if ($val->enabled == ChapterApiParam::ENABLED_YES) {
+				if ($val->location == ChapterApiParam::LOCATION_REQUEST_HEADER) {
+					if (!$request->hasHeader($val->name)) {
+						$msg .= 'header:' . $val->name . '必填 ';
+					}
+				} elseif ($val->location == ChapterApiParam::LOCATION_REQUEST_QUERY_STRING) {
+					if ($request->query($val->name) == null) {
+						$msg .= 'query:' . $val->name . '必填 ';
+					}
+				} elseif ($val->location == ChapterApiParam::LOCATION_REQUEST_BODY_RAW || $jsonData) {
+					if (!(isset($jsonData[$val->name]) && $jsonData[$val->name])) {
+						$msg .= 'params:' . $val->name . '必填 ';
+					}
+				} elseif (in_array($val->location, [ChapterApiParam::LOCATION_REQUEST_BODY_FROM, ChapterApiParam::LOCATION_REQUEST_BODY_URLENCODED])) {
+					if ($request->post($val->name) == null) {
+						$msg .= 'params:' . $val->name . '必填 ';
+					}
 				}
 			}
 		}
 		return $msg;
 	}
 
-	public function mackMockApiReponse(Request $request, $route)
+	public function mackMockApiReponse(Request $request, $id, $route)
 	{
-		$routeArr = explode('/', $route);
-		if (count($routeArr) > 3) {
-			if ($routeArr[2] == 'mockApiReponse' && is_numeric($routeArr[3])) {
-				$baseUrl = str_replace('/' . $routeArr[1] . '/' . $routeArr[2] . '/' . $routeArr[3] . '/', '', $route);
-				$baseUrlData = explode('?', $baseUrl);
-				$urlPath = $baseUrlData[0];
-				$ChapterApi = new Document\ChapterApi();
-				$Chapter = new Document\Chapter();
-				$api = Document\Chapter::query()
-					->where('document_id', $routeArr[3])
-					->leftJoin($ChapterApi->getTable(), 'chapter_id', '=', $Chapter->getTable() . '.id')
-					->whereIn('url', [$urlPath, '/' . $urlPath])
-					->select([$ChapterApi->getTable() . '.*'])
-					->first();
-				$methodLabel = $ChapterApi->methodLabel();
-				if ($api && $api->method) {
-					if (isset($methodLabel[$api->method])) {
-						if ($methodLabel[$api->method] == $request->getMethod()) {
-							//验证参数
-							$checkMsg = $this->checkRequest($request, $api);
-							if ($checkMsg) {
-								return ['code' => 422, 'msg' => $checkMsg];
-							}
-							//获取rule参数样例
-							$reponseId = 0;
-							$ChapterApiReponse = Document\ChapterApiReponse::query()->where('chapter_id', $api->chapter_id)->get()->toArray();
-							if (count($ChapterApiReponse)) {
-								$reponseIds = array_column($ChapterApiReponse, 'id');
-								$reponseId = $reponseIds[rand(0, count($reponseIds) - 1)];
-							}
-
-							$chapterDemoLogic = new ChapterRuleLogic($api->chapter_id);
-							return $chapterDemoLogic->getChapterRuleMock($reponseId);
-						} else {
-							return ['code' => 401, 'msg' => '请求类型错误'];
-						}
-					} else {
-						return ['code' => 402, 'msg' => '不支持当前请求类型：' . $request->getMethod()];
+		$urlPath = $route;
+		$ChapterApi = new Document\ChapterApi();
+		$Chapter = new Document\Chapter();
+		$api = Document\Chapter::query()
+			->where('document_id', $id)
+			->leftJoin($ChapterApi->getTable(), 'chapter_id', '=', $Chapter->getTable() . '.id')
+			->whereIn('url', [$urlPath, '/' . $urlPath])
+			->select([$ChapterApi->getTable() . '.*'])
+			->first();
+		$methodLabel = $ChapterApi->methodLabel();
+		if ($api && $api->method) {
+			if (isset($methodLabel[$api->method])) {
+				if ($methodLabel[$api->method] == $request->getMethod()) {
+					//验证参数
+					$checkMsg = $this->checkRequest($request, $api);
+					if ($checkMsg) {
+						return ['code' => 422, 'msg' => $checkMsg];
 					}
+					//获取rule参数样例
+					$reponseId = 0;
+					$ChapterApiReponse = Document\ChapterApiReponse::query()->where('chapter_id', $api->chapter_id)->get()->toArray();
+					if (count($ChapterApiReponse)) {
+						$reponseIds = array_column($ChapterApiReponse, 'id');
+						$reponseId = $reponseIds[rand(0, count($reponseIds) - 1)];
+					}
+
+					$chapterDemoLogic = new ChapterRuleLogic($api->chapter_id);
+					return $chapterDemoLogic->getChapterRuleMock($reponseId);
+				} else {
+					return ['code' => 401, 'msg' => '请求类型错误'];
 				}
+			} else {
+				return ['code' => 402, 'msg' => '不支持当前请求类型：' . $request->getMethod()];
 			}
 		}
 		return ['code' => 400, 'msg' => '请求地址不存在'];
