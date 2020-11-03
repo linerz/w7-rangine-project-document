@@ -84,12 +84,19 @@ class DocumentController extends BaseController
 			if ($role == 1) {
 				$permissions = [DocumentPermission::MANAGER_PERMISSION];
 			}
-			//$role为2代表为参与者
+
+			//$role为2我操作的
 			if ($role == 2) {
 				$permissions = [DocumentPermission::OPERATOR_PERMISSION];
 			}
+
 			if ($onlyRead) {
 				$permissions = [DocumentPermission::READER_PERMISSION];
+			}
+
+			//$role为3代表为我参与的（已创建、我操作、可阅读）
+			if ($role == 'all') {
+				$permissions = [DocumentPermission::MANAGER_PERMISSION, DocumentPermission::OPERATOR_PERMISSION, DocumentPermission::READER_PERMISSION];
 			}
 
 			$query = DocumentPermission::query()->where('user_id', '=', $user->id)
@@ -451,7 +458,15 @@ class DocumentController extends BaseController
 
 	public function delete(Request $request)
 	{
+		$data = $this->validate($request, [
+			'name' => 'required',
+		], [
+			'name.required' => '文档名称',
+		]);
 		$document = $this->checkPermissionAndGetDocument($request);
+		if ($document->name != $data['name']) {
+			throw new ErrorHttpException('文档名称错误');
+		}
 		try {
 			$user = $request->getAttribute('user');
 			DocumentLogic::instance()->deleteByDocument($document);
